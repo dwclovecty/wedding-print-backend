@@ -5,7 +5,7 @@ const fs = require('fs');
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit '30mb' }));
+app.use(express.json({ limit: '30mb' }));
 
 const transporter = nodemailer.createTransport({
   host 'smtp.gmail.com',
