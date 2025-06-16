@@ -1,47 +1,47 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
-const cors = require('cors');
-const fs = require('fs');
-const app = express();
+  const sgMail = require('@sendgrid/mail');
+  const fetch = require('node-fetch');
+  const app = express();
 
-app.use(cors());
-app.use(express.json({ limit: '30mb' }));
+  app.use(express.json());
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER || 'a14913933@gmail.com',
-    pass: process.env.EMAIL_PASS || 'stvcrztxrfbytdaw'
-  }
-});
+  app.post('/send-email', async (req, res) => {
+    try {
+      let { base64Photo, photoUrl } = req.body;
+      if (!base64Photo && photoUrl) {
+        console.log('Fetching photo from URL:', photoUrl);
+        const response = await fetch(photoUrl);
+        if (!response.ok) throw new Error(`Failed to fetch photo: ${response.status}`);
+        const buffer = await response.buffer();
+        base64Photo = buffer.toString('base64');
+      }
+      if (!base64Photo || typeof base64Photo !== 'string' || base64Photo.length < 100) {
+        return res.status(400).send('無效的 Base64 照片');
+      }
 
-app.post('/send-email', async (req, res) => {
-  try {
-    const { base64Photo } = req.body;
-    await transporter.sendMail({
-      from: 'a14913933@gmail.com',
-      to: 'jvt7394j7j3en4@print.epsonconnect.com',
-      subject: 'Wedding Print Photo',
-      text: 'Photo for printing via Epson Connect',
-      attachments: [{
-        filename: 'photo.jpg',
+      const attachment = {
         content: base64Photo,
-        encoding: 'base64'
-      }]
-    });
-    fs.appendFileSync('send-email.log', `Sent email at ${new Date().toISOString()}\n`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('後端寄信失敗:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+        filename: 'photo.jpg',
+        type: 'image/jpeg',
+        disposition: 'attachment'
+      };
 
-app.get('/', (req, res) => {
-  res.send('Wedding Print Backend is running!');
-});
+      const msg = {
+        to: '你的EpsonConnect郵箱@example.com', // 請替換為實際 Epson Connect 郵箱
+        from: 'a14913933@gmail.com',
+        subject: 'Wedding Photo Print',
+        text: 'Please print the attached photo.',
+        attachments: [attachment]
+      };
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server running on port ${port}`));
+      await sgMail.send(msg);
+      console.log('SendGrid 寄送成功');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('SendGrid 錯誤:', error);
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.listen(3000, () => console.log('Server running on port 3000'));
